@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: cardgame
+server:
+  port: 8080
