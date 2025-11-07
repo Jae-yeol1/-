@@ -17,12 +17,22 @@
 
     <section class="controls">
       <div class="bet">
-        <label>베팅 금액</label>
-        <input v-model.number="bet" type="number" min="10" step="10" />
-        <button class="primary" :disabled="loading || !isHost" @click="start">
-          라운드 시작
-        </button>
-        <span class="hint" v-if="!isHost">방장만 시작할 수 있습니다.</span>
+        <div class="bet-header">
+          <label>베팅 금액</label>
+          <span class="hint" v-if="!isHost">방장만 시작할 수 있습니다.</span>
+        </div>
+        <div class="bet-input">
+          <input v-model.number="bet" type="number" min="10" step="10" />
+          <button class="primary" :disabled="loading || !isHost" @click="start">
+            라운드 시작
+          </button>
+        </div>
+        <ChipTray
+          class="bet-chips"
+          v-model="bet"
+          :min="10"
+          :disabled="loading || !isHost"
+        />
       </div>
       <div class="actions">
         <button @click="hit" :disabled="loading">히트</button>
@@ -72,6 +82,7 @@
 <script setup>
 import { computed, reactive, ref, onMounted } from 'vue'
 import CardImg from '../CardImg.vue'
+import ChipTray from '../ChipTray.vue'
 import { jget, jpost } from '../../api'
 
 const props = defineProps({
@@ -172,9 +183,14 @@ async function action(path){
 .info-row div{ min-width:180px; }
 .label{ display:block; color:rgba(255,255,255,.65); font-size:.85rem; margin-bottom:6px; }
 .controls{ display:flex; flex-direction:column; gap:16px; }
-.bet{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:rgba(255,255,255,.06); padding:14px 18px; border-radius:14px; }
-.bet input{ width:120px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(8,14,24,.75); color:#fff; }
-.primary{ padding:12px 18px; border:none; border-radius:12px; cursor:pointer; background:linear-gradient(135deg,#34d899,#1baf75); color:#fff; font-weight:600; }
+.bet{ display:flex; flex-direction:column; gap:16px; background:rgba(255,255,255,.06); padding:16px 18px; border-radius:16px; }
+.bet-header{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.bet-header label{ font-weight:600; }
+.bet-input{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.bet input{ flex:0 0 140px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(8,14,24,.75); color:#fff; }
+.bet-chips{ width:100%; }
+.primary{ padding:12px 20px; border:none; border-radius:12px; cursor:pointer; background:linear-gradient(135deg,#34d899,#1baf75); color:#fff; font-weight:600; box-shadow:0 14px 26px rgba(27,175,117,.28); }
+.primary:disabled{ box-shadow:none; }
 .hint{ color:rgba(255,255,255,.6); font-size:.85rem; }
 .actions{ display:flex; flex-wrap:wrap; gap:12px; }
 .actions button{ padding:12px 18px; border-radius:12px; border:none; background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }

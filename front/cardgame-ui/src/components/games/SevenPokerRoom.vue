@@ -21,9 +21,20 @@
 
     <section class="controls">
       <div class="bet">
-        <label>앤티</label>
-        <input v-model.number="ante" type="number" min="10" step="10" />
-        <button class="primary" :disabled="loading || (!isHost && mode==='multi')" @click="start">게임 시작</button>
+        <div class="bet-header">
+          <label>앤티</label>
+        </div>
+        <div class="bet-input">
+          <input v-model.number="ante" type="number" min="10" step="10" />
+          <button class="primary" :disabled="loading || (!isHost && mode==='multi')" @click="start">게임 시작</button>
+        </div>
+        <ChipTray
+          class="bet-chips"
+          v-model="ante"
+          :min="10"
+          :disabled="loading || (!isHost && mode==='multi')"
+          :denominations="[10, 50, 100, 500, 1000]"
+        />
       </div>
       <div class="actions">
         <button @click="nextStage" :disabled="loading || (!isHost && mode==='multi')">다음 단계</button>
@@ -46,8 +57,16 @@
             :delay="index*40"
           />
         </div>
+        <div v-if="side.user === user" class="player-chips">
+          <ChipTray
+            v-model="betAmount"
+            :min="10"
+            :denominations="[10, 50, 100, 500, 1000]"
+            :disabled="loading"
+          />
+        </div>
         <div class="player-actions">
-          <button @click="bet(side.user)" :disabled="loading || side.user !== user">베팅 +10</button>
+          <button @click="bet(side.user)" :disabled="loading || side.user !== user">베팅 +{{ betAmountDisplay }}</button>
           <button @click="check(side.user)" :disabled="loading || side.user !== user">체크</button>
           <button @click="fold(side.user)" :disabled="loading || side.user !== user">폴드</button>
         </div>
@@ -57,8 +76,9 @@
   <div v-else class="empty">방 정보가 없습니다.</div>
 </template>
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import CardImg from '../CardImg.vue'
+import ChipTray from '../ChipTray.vue'
 import { jget, jpost } from '../../api'
 
 const props = defineProps({
@@ -69,6 +89,7 @@ const props = defineProps({
 })
 
 const ante = ref(50)
+const betAmount = ref(50)
 const loading = ref(false)
 const stage = ref('READY')
 const pot = ref(0)
@@ -86,6 +107,20 @@ const isHost = computed(() => {
 })
 
 const players = computed(() => playersState.value)
+const betAmountDisplay = computed(() => Math.max(10, Math.round(betAmount.value || 0)).toLocaleString())
+const betAmountValue = computed(() => Math.max(10, Math.round(betAmount.value || 0)))
+
+watch(ante, (value) => {
+  if(value < 10){
+    ante.value = 10
+  }
+})
+
+watch(betAmount, (value) => {
+  if(value < 10){
+    betAmount.value = 10
+  }
+})
 
 onMounted(() => {
   if(roomId.value){
@@ -131,7 +166,7 @@ async function refresh(){
   }
 }
 
-async function bet(target){ await action('/api/seven/bet', { user: target, amount: 10 }) }
+async function bet(target){ await action('/api/seven/bet', { user: target, amount: betAmountValue.value }) }
 async function check(target){ await action('/api/seven/check', { user: target }) }
 async function fold(target){ await action('/api/seven/fold', { user: target }) }
 async function nextStage(){ await action('/api/seven/next') }
@@ -158,9 +193,13 @@ async function action(path, extra={}){
 .info-row div{ min-width:160px; }
 .label{ display:block; color:rgba(255,255,255,.65); font-size:.85rem; margin-bottom:6px; }
 .controls{ display:flex; flex-direction:column; gap:16px; }
-.bet{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; background:rgba(255,255,255,.06); padding:14px 18px; border-radius:14px; }
-.bet input{ width:120px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(8,14,24,.75); color:#fff; }
-.primary{ padding:12px 18px; border:none; border-radius:12px; cursor:pointer; background:linear-gradient(135deg,#34d899,#1baf75); color:#fff; font-weight:600; }
+.bet{ display:flex; flex-direction:column; gap:16px; background:rgba(255,255,255,.06); padding:16px 18px; border-radius:16px; }
+.bet-header{ display:flex; justify-content:space-between; align-items:center; }
+.bet-input{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.bet input{ flex:0 0 140px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(8,14,24,.75); color:#fff; }
+.bet-chips{ width:100%; }
+.primary{ padding:12px 20px; border:none; border-radius:12px; cursor:pointer; background:linear-gradient(135deg,#34d899,#1baf75); color:#fff; font-weight:600; box-shadow:0 14px 26px rgba(27,175,117,.28); }
+.primary:disabled{ box-shadow:none; }
 .actions{ display:flex; gap:12px; flex-wrap:wrap; }
 .actions button{ padding:12px 18px; border-radius:12px; border:none; background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }
 .actions button:disabled{ opacity:.5; cursor:not-allowed; }
@@ -168,6 +207,7 @@ async function action(path, extra={}){
 .player{ background:rgba(8,14,24,.75); border-radius:18px; padding:18px; border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; gap:12px; }
 .player.me{ border-color:#5d9cff; box-shadow:0 0 0 3px rgba(93,156,255,.3); }
 .cards{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+.player-chips{ margin-top:8px; }
 .player-actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
 .player-actions button{ padding:10px 14px; border-radius:10px; border:none; background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }
 .empty{ color:rgba(255,255,255,.6); text-align:center; padding:40px 0; }

@@ -59,9 +59,22 @@
 
     <section class="controls">
       <div class="bet" v-if="!state.inProgress">
-        <label>베팅 금액</label>
-        <input v-model.number="bet" type="number" min="10" step="10" />
-        <button class="primary" :disabled="loading" @click="start">라운드 시작</button>
+        <div class="bet-header">
+          <label>베팅 금액</label>
+          <span v-if="state.balance !== null" class="bet-balance">잔액 {{ state.balance.toLocaleString() }}</span>
+        </div>
+        <div class="bet-input">
+          <input v-model.number="bet" type="number" min="10" step="10" />
+          <button class="primary" :disabled="loading" @click="start">라운드 시작</button>
+        </div>
+        <ChipTray
+          class="bet-chips"
+          v-model="bet"
+          :min="10"
+          :max="maxBet"
+          :balance="state.balance ?? undefined"
+          :disabled="loading"
+        />
       </div>
       <div class="actions" v-else>
         <button @click="hit" :disabled="loading">히트</button>
@@ -77,6 +90,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import CardImg from '../CardImg.vue'
+import ChipTray from '../ChipTray.vue'
 import { jpost } from '../../api'
 
 const props = defineProps({
@@ -98,6 +112,19 @@ const state = reactive({
 
 const user = computed(() => props.user)
 const dealerTotal = computed(() => state.inProgress ? '??' : (state.dealer.total ?? ''))
+const maxBet = computed(() => typeof state.balance === 'number' ? Math.max(10, state.balance) : Number.POSITIVE_INFINITY)
+
+watch(maxBet, (limit) => {
+  if(Number.isFinite(limit) && bet.value > limit){
+    bet.value = limit
+  }
+})
+
+watch(bet, (value, old) => {
+  if(value < 10){
+    bet.value = 10
+  }
+}, { flush: 'post' })
 
 watch(() => props.decks, () => {
   if(state.inProgress){
@@ -184,9 +211,15 @@ async function action(path){
 .hand-header h4{ margin:0; font-size:1.1rem; }
 .status{ text-align:right; color:rgba(255,255,255,.6); }
 .controls{ display:flex; flex-direction:column; gap:16px; align-items:center; }
-.bet{ display:flex; gap:12px; align-items:center; background:rgba(255,255,255,.06); padding:14px 18px; border-radius:14px; }
-.bet input{ width:120px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(8,14,24,.75); color:#fff; }
-.bet button{ padding:12px 18px; border:none; border-radius:12px; cursor:pointer; background:linear-gradient(135deg,#34d899,#1baf75); color:#fff; font-weight:600; }
+.bet{ display:flex; flex-direction:column; gap:16px; align-items:stretch; background:rgba(255,255,255,.06); padding:16px 18px; border-radius:16px; }
+.bet-header{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.bet-header label{ font-weight:600; }
+.bet-balance{ color:rgba(255,255,255,.65); font-size:.9rem; }
+.bet-input{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.bet input{ flex:0 0 140px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(8,14,24,.75); color:#fff; }
+.bet button{ padding:12px 20px; border:none; border-radius:12px; cursor:pointer; background:linear-gradient(135deg,#34d899,#1baf75); color:#fff; font-weight:600; box-shadow:0 14px 26px rgba(27,175,117,.28); }
+.bet button:disabled{ box-shadow:none; }
+.bet-chips{ width:100%; }
 .actions{ display:flex; flex-wrap:wrap; gap:12px; justify-content:center; }
 .actions button{ padding:12px 18px; border-radius:12px; border:none; background:rgba(255,255,255,.08); color:#fff; cursor:pointer; transition:background .2s ease; }
 .actions button:hover{ background:rgba(255,255,255,.16); }

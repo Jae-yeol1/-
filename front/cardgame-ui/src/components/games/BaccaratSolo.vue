@@ -9,9 +9,18 @@
           <option value="TIE">Tie</option>
         </select>
       </div>
-      <div class="field">
+      <div class="field amount">
         <label>베팅 금액</label>
-        <input v-model.number="amount" type="number" min="10" step="10" />
+        <div class="bet-input">
+          <input v-model.number="amount" type="number" min="10" step="10" />
+        </div>
+        <ChipTray
+          class="bet-chips"
+          v-model="amount"
+          :min="10"
+          :balance="balance"
+          :disabled="loading"
+        />
       </div>
       <div class="switches">
         <label><input type="checkbox" v-model="pairPlayer" /> Player Pair</label>
@@ -64,6 +73,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import CardImg from '../CardImg.vue'
+import ChipTray from '../ChipTray.vue'
 import { jpost } from '../../api'
 
 const props = defineProps({
@@ -80,6 +90,10 @@ const loading = ref(false)
 const player = ref(null)
 const banker = ref(null)
 const result = ref(null)
+
+const balance = computed(() => {
+  return typeof result.value?.balance === 'number' ? result.value.balance : undefined
+})
 
 const user = computed(() => props.user)
 
@@ -100,7 +114,14 @@ async function betting(){
     const detail = res.detail || res
     player.value = detail.player || null
     banker.value = detail.banker || null
-    result.value = detail.delta!==undefined ? { delta: detail.delta, balance: detail.balance ?? 0 } : null
+    if(detail.delta !== undefined || typeof detail.balance === 'number'){
+      result.value = {
+        delta: detail.delta ?? 0,
+        balance: typeof detail.balance === 'number' ? detail.balance : (result.value?.balance ?? 0)
+      }
+    }else{
+      result.value = null
+    }
   }catch(err){
     console.error(err)
   }finally{
@@ -112,6 +133,10 @@ async function betting(){
 .game-board{ display:flex; flex-direction:column; gap:24px; }
 .betting{ display:grid; gap:16px; background:rgba(255,255,255,.06); border-radius:18px; padding:18px 22px; }
 .field{ display:flex; flex-direction:column; gap:8px; }
+.field.amount{ gap:12px; }
+.bet-input{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.bet-input input{ flex:0 0 160px; }
+.bet-chips{ width:100%; }
 .field label{ color:rgba(255,255,255,.7); font-size:.95rem; }
 .field select,.field input{ padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,.18); background:rgba(8,14,24,.75); color:#fff; }
 .switches{ display:flex; gap:16px; flex-wrap:wrap; color:rgba(255,255,255,.8); }
