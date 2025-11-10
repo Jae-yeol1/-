@@ -17,6 +17,10 @@
         <span class="label">포트</span>
         <strong>{{ pot.toLocaleString() }}</strong>
       </div>
+      <div>
+        <span class="label">현재 턴</span>
+        <strong>{{ turnUser || '-' }}</strong>
+      </div>
     </section>
 
     <section class="controls">
@@ -43,9 +47,14 @@
     </section>
 
     <section class="players">
-      <article v-for="side in players" :key="side.user" :class="['player', { me: side.user === user }]">
+      <article
+        v-for="side in players"
+        :key="side.user"
+        :class="['player', { me: side.user === user, acting: side.user === turnUser, folded: side.folded }]"
+      >
         <header>
           <h4>{{ side.user }}</h4>
+          <small v-if="side.ai" class="profile">{{ side.profile || 'AI' }}</small>
         </header>
         <div class="cards">
           <CardImg
@@ -57,6 +66,15 @@
             :delay="index*40"
           />
         </div>
+        <div class="player-meta">
+          <div class="bet-summary">
+            <span>총 베팅</span>
+            <strong>{{ formatChips(side.bet) }}</strong>
+          </div>
+          <div class="action-status" :class="(side.action || '').toLowerCase()">
+            {{ actionDisplay(side) }}
+          </div>
+        </div>
         <div v-if="side.user === user" class="player-chips">
           <ChipTray
             v-model="betAmount"
@@ -66,10 +84,11 @@
           />
         </div>
         <div class="player-actions">
-          <button @click="bet(side.user)" :disabled="loading || side.user !== user">베팅 +{{ betAmountDisplay }}</button>
-          <button @click="check(side.user)" :disabled="loading || side.user !== user">체크</button>
-          <button @click="fold(side.user)" :disabled="loading || side.user !== user">폴드</button>
+          <button @click="bet(side.user)" :disabled="!canAct(side)">베팅 +{{ betAmountDisplay }}</button>
+          <button @click="check(side.user)" :disabled="!canAct(side)">체크</button>
+          <button @click="fold(side.user)" :disabled="!canAct(side)">폴드</button>
         </div>
+        <div v-if="side.folded" class="fold-banner">폴드</div>
       </article>
     </section>
   </div>
@@ -92,8 +111,11 @@ const ante = ref(50)
 const betAmount = ref(50)
 const loading = ref(false)
 const stage = ref('READY')
+const round = ref(0)
 const pot = ref(0)
 const playersState = ref([])
+const inProgress = ref(false)
+const turn = ref(null)
 
 const user = computed(() => props.user)
 const mode = computed(() => props.mode)
@@ -109,6 +131,7 @@ const isHost = computed(() => {
 const players = computed(() => playersState.value)
 const betAmountDisplay = computed(() => Math.max(10, Math.round(betAmount.value || 0)).toLocaleString())
 const betAmountValue = computed(() => Math.max(10, Math.round(betAmount.value || 0)))
+const turnUser = computed(() => turn.value)
 
 watch(ante, (value) => {
   if(value < 10){
@@ -133,7 +156,7 @@ async function start(){
   loading.value = true
   try{
     const list = mode.value === 'solo'
-      ? [user.value, `${user.value}_AI1`, `${user.value}_AI2`]
+      ? [user.value, `AI_${user.value}`]
       : (providedPlayers.value.length ? providedPlayers.value : [user.value])
     const params = new URLSearchParams({
       roomId: roomId.value,
@@ -157,7 +180,11 @@ async function refresh(){
     const res = await jget(`/api/seven/state?${params.toString()}`)
     const detail = res.detail || res
     stage.value = detail.stage || 'READY'
+    if(typeof detail.round === 'number'){ round.value = detail.round }
     pot.value = detail.pot || 0
+    inProgress.value = Boolean(detail.inProgress)
+    turn.value = detail.turn || null
+    if(detail.ante){ ante.value = detail.ante }
     playersState.value = detail.players || []
   }catch(err){
     console.error(err)
@@ -173,6 +200,10 @@ async function nextStage(){ await action('/api/seven/next') }
 
 async function action(path, extra={}){
   if(!roomId.value) return
+  if(extra.user){
+    const target = findSide(extra.user)
+    if(!canAct(target)) return
+  }
   loading.value = true
   try{
     const params = new URLSearchParams({ roomId: roomId.value })
@@ -185,6 +216,37 @@ async function action(path, extra={}){
   }finally{
     loading.value = false
   }
+}
+
+function findSide(uid){
+  if(!uid) return null
+  return players.value.find(p => p.user === uid) || null
+}
+
+function formatChips(value){
+  const num = Number(value) || 0
+  return Math.max(0, Math.round(num)).toLocaleString()
+}
+
+function actionDisplay(side){
+  if(!side) return '대기 중'
+  const type = side.action
+  if(type === 'BET'){
+    return `베팅 +${formatChips(side.actionAmount)}`
+  }
+  if(type === 'CHECK') return '체크'
+  if(type === 'FOLD') return '폴드'
+  if(type === 'ANTE') return `앤티 ${formatChips(side.actionAmount)}`
+  return '대기 중'
+}
+
+function canAct(side){
+  if(!side) return false
+  if(side.user !== user.value) return false
+  if(side.folded) return false
+  if(!inProgress.value) return false
+  if(turn.value && turn.value !== side.user) return false
+  return !loading.value
 }
 </script>
 <style scoped>
@@ -203,12 +265,26 @@ async function action(path, extra={}){
 .actions{ display:flex; gap:12px; flex-wrap:wrap; }
 .actions button{ padding:12px 18px; border-radius:12px; border:none; background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }
 .actions button:disabled{ opacity:.5; cursor:not-allowed; }
-.players{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:18px; }
-.player{ background:rgba(8,14,24,.75); border-radius:18px; padding:18px; border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; gap:12px; }
-.player.me{ border-color:#5d9cff; box-shadow:0 0 0 3px rgba(93,156,255,.3); }
+.players{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; }
+.player{ background:rgba(8,14,24,.75); border-radius:18px; padding:20px; border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; gap:14px; position:relative; overflow:hidden; transition:border-color .2s ease, box-shadow .2s ease; }
+.player.me{ border-color:#5d9cff; box-shadow:0 0 0 3px rgba(93,156,255,.28); }
+.player.acting{ border-color:rgba(255,214,120,.8); box-shadow:0 0 0 3px rgba(255,214,120,.25); }
+.player.folded{ opacity:.55; }
+.player header{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.player .profile{ padding:4px 10px; border-radius:999px; background:rgba(255,255,255,.1); color:rgba(255,255,255,.75); font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
 .cards{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
-.player-chips{ margin-top:8px; }
+.player-meta{ display:flex; gap:18px; align-items:center; flex-wrap:wrap; justify-content:space-between; }
+.bet-summary{ display:flex; flex-direction:column; gap:4px; font-size:.85rem; }
+.bet-summary span{ color:rgba(255,255,255,.65); }
+.bet-summary strong{ font-size:1.15rem; color:#ffd36b; }
+.action-status{ padding:6px 14px; border-radius:999px; background:rgba(255,255,255,.08); font-size:.85rem; letter-spacing:.04em; text-transform:uppercase; }
+.action-status.bet{ background:rgba(255,186,120,.18); color:#ffb87b; }
+.action-status.check{ background:rgba(120,200,255,.18); color:#7bcaff; }
+.action-status.fold{ background:rgba(255,136,152,.18); color:#ff91a3; }
+.player-chips{ margin-top:auto; }
 .player-actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
-.player-actions button{ padding:10px 14px; border-radius:10px; border:none; background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }
+.player-actions button{ padding:10px 14px; border-radius:10px; border:none; background:rgba(255,255,255,.08); color:#fff; cursor:pointer; flex:1 1 30%; min-width:110px; }
+.player-actions button:disabled{ opacity:.5; cursor:not-allowed; }
+.fold-banner{ position:absolute; right:16px; bottom:16px; padding:6px 12px; border-radius:999px; background:rgba(255,136,152,.2); color:#ff91a3; font-size:.8rem; font-weight:600; }
 .empty{ color:rgba(255,255,255,.6); text-align:center; padding:40px 0; }
 </style>
