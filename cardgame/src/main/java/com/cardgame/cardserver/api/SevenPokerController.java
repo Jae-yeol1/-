@@ -10,13 +10,22 @@ public class SevenPokerController {
     private static List<Map<String,Object>> maskFor(String viewer, Map<String,SevenPokerGame.Side> players){
         List<Map<String,Object>> out=new ArrayList<>();
         for(var e: players.entrySet()){
-            String uid=e.getKey(); var cards=e.getValue().cards;
+            String uid=e.getKey(); var side=e.getValue(); var cards=side.cards;
             List<Map<String,Object>> show=new ArrayList<>();
             for(int i=0;i<cards.size();i++){
                 if(!viewer.equals(uid) && (i<2 || i==6)) show.add(Map.of("rank","BACK","suit",""));
                 else show.add(dto(cards.get(i)));
             }
-            out.add(Map.of("user", uid, "cards", show));
+            Map<String,Object> entry=new LinkedHashMap<>();
+            entry.put("user", uid);
+            entry.put("cards", show);
+            entry.put("bet", side.contributed);
+            entry.put("action", side.lastAction);
+            entry.put("actionAmount", side.lastAmount);
+            entry.put("folded", side.folded);
+            entry.put("ai", side.ai);
+            if(side.profileName()!=null) entry.put("profile", side.profileName());
+            out.add(entry);
         }
         return out;
     }
@@ -25,13 +34,23 @@ public class SevenPokerController {
         var list = Arrays.asList(users.split(","));
         var s = st(roomId);
         game.start(s, list, ante);
-        return ApiResponse.of("ok", true).detail(Map.of("inProgress", s.inProgress, "stage", s.stage));
+        return ApiResponse.of("ok", true).detail(Map.of(
+                "inProgress", s.inProgress,
+                "stage", s.stageName,
+                "round", s.stage,
+                "turn", s.turn
+        ));
     }
     @GetMapping("/state")
     public Object state(@RequestParam String roomId, @RequestParam String viewer){
         var s = st(roomId);
         Map<String,Object> d=new LinkedHashMap<>();
-        d.put("inProgress", s.inProgress); d.put("stage", s.stage); d.put("pot", s.pot);
+        d.put("inProgress", s.inProgress);
+        d.put("stage", s.stageName);
+        d.put("round", s.stage);
+        d.put("turn", s.turn);
+        d.put("ante", s.ante);
+        d.put("pot", s.pot);
         d.put("players", maskFor(viewer, s.players));
         return ApiResponse.of("ok", true).detail(d);
     }
