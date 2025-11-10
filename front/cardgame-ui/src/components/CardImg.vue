@@ -28,7 +28,7 @@ const src = ref('')
 function buildAttempts(){
   const base = code.value
   if(!base){
-    return ['BACK.svg', 'BACK.png']
+    return ['BACK.png', 'BACK.svg']
   }
   const variants = new Set([
     `${base}.svg`,
@@ -50,23 +50,29 @@ function buildAttempts(){
   variants.add(`${compact}.png`)
   variants.add(`${dashed}.svg`)
   variants.add(`${dashed}.png`)
-  return [...variants, 'BACK.svg', 'BACK.png']
+  return [...variants, 'BACK.png', 'BACK.svg']
+}
+
+const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+
+function resolve(path){
+  return `${basePath}${path}`
 }
 
 function nextSrc(){
   const attempt = attempts.value.shift()
-  return attempt ? `/cards/${attempt}` : '/cards/BACK.svg'
+  return attempt ? resolve(`/cards/${attempt}`) : resolve('/cards/BACK.png')
 }
 
 watchEffect(() => {
   attempts.value = buildAttempts()
   const next = attempts.value.shift()
-  src.value = next ? `/cards/${next}` : '/cards/BACK.svg'
+  src.value = next ? resolve(`/cards/${next}`) : resolve('/cards/BACK.png')
 })
 
 function onError(){
   if(!attempts.value.length){
-    src.value = '/cards/BACK.svg'
+    src.value = resolve('/cards/BACK.png')
     return
   }
   src.value = nextSrc()
