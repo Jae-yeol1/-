@@ -1,8 +1,10 @@
 <template>
-  <div class="card3d" :class="{ flip: flipped && !isHidden }" :style="{ '--delay': `${delay}ms` }">
-    <div class="face back"></div>
-    <div class="face front">
-      <img v-if="!isHidden" :src="src" :alt="alt" @error="onError" />
+  <div class="card3d" :class="{ flip: showFront }" :style="{ '--delay': `${delay}ms` }">
+    <div v-if="!showFront" class="face back">
+      <img :src="backSrc" alt="Card back" />
+    </div>
+    <div v-else class="face front">
+      <img :src="src" :alt="alt" @error="onError" />
     </div>
   </div>
 </template>
@@ -28,6 +30,7 @@ const code = computed(() => {
 })
 
 const alt = computed(() => `${props.rank} of ${props.suit}`)
+const showFront = computed(() => props.flipped && !isHidden.value)
 const attempts = ref([])
 const src = ref('')
 
@@ -104,6 +107,14 @@ function resolve(path){
   return `${basePath}${path}`
 }
 
+const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+
+function resolve(path){
+  return `${basePath}${path}`
+}
+
+const backSrc = resolve('/cards/BACK.png')
+
 function nextSrc(){
   const attempt = attempts.value.shift()
   return attempt ? resolve(`/cards/${attempt}`) : resolve('/cards/BACK.png')
@@ -124,11 +135,12 @@ function onError(){
 }
 </script>
 <style scoped>
-.card3d{ width: calc(var(--card-w)*var(--s,1)); height: calc(var(--card-h)*var(--s,1)); perspective: 600px; display:inline-block; margin: 2px; animation: deal .4s ease var(--delay) both; position: relative; transform-style: preserve-3d; transition: transform .45s ease; --s: v-bind(size); }
-.face{ width:100%; height:100%; position:absolute; top:0; left:0; backface-visibility: hidden; border-radius: 10px; overflow: hidden; box-shadow: 0 6px 14px rgba(0,0,0,.35); }
+.card3d{ width: calc(var(--card-w)*var(--s,1)); height: calc(var(--card-h)*var(--s,1)); perspective: 600px; display:inline-block; margin: 2px; animation: deal .4s ease var(--delay) both; position: relative; transform-style: preserve-3d; --s: v-bind(size); }
+.face{ width:100%; height:100%; position:absolute; top:0; left:0; backface-visibility: hidden; border-radius: 10px; overflow: hidden; box-shadow: 0 6px 14px rgba(0,0,0,.35); transition: transform .45s ease; }
 .front{ transform: rotateY(180deg); background:#fff; display:grid; place-items:center; }
-.back{ background: radial-gradient(600px 300px at 50% -50%, #2753b6, #0e2a68); border:1px solid #0b2e66; }
+.back{ background: radial-gradient(600px 300px at 50% -50%, #2753b6, #0e2a68); border:1px solid #0b2e66; transform: rotateY(0deg); display:grid; place-items:center; }
 img{ width:100%; height:100%; object-fit: cover; }
-.card3d.flip{ transform: rotateY(180deg); }
+.card3d.flip .front{ transform: rotateY(0deg); }
+.card3d.flip .back{ transform: rotateY(180deg); }
 @keyframes deal{ from{ transform: translateY(-14px); opacity:0; } to{ transform: translateY(0); opacity:1; } }
 </style>
