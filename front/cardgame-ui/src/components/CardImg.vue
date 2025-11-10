@@ -35,19 +35,7 @@ const attempts = ref([])
 const src = ref('')
 
 function buildAttempts(){
-  const base = code.value
-  if(!base){
-    return ['BACK.png', 'BACK.svg']
-  }
-  const variants = new Set([
-    `${base}.svg`,
-    `${base}.png`,
-    `${base}.webp`,
-    `${base.toUpperCase()}.svg`,
-    `${base.toUpperCase()}.png`
-  ])
-  const compact = base.replace('_','')
-  const dashed = base.replace('_','-')
+  const base = (code.value || '').trim()
   const suitNames = { H:'HEARTS', D:'DIAMONDS', C:'CLUBS', S:'SPADES' }
   const attempts = []
   const added = new Set()
@@ -94,11 +82,9 @@ function buildAttempts(){
       addVariant(combo)
     }
   }
-  variants.add(`${compact}.svg`)
-  variants.add(`${compact}.png`)
-  variants.add(`${dashed}.svg`)
-  variants.add(`${dashed}.png`)
-  return [...variants, 'BACK.png', 'BACK.svg']
+
+  addVariant('BACK')
+  return attempts
 }
 
 const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
@@ -111,18 +97,18 @@ const backSrc = resolve('/cards/BACK.png')
 
 function nextSrc(){
   const attempt = attempts.value.shift()
-  return attempt ? resolve(`/cards/${attempt}`) : resolve('/cards/BACK.png')
+  return attempt ? resolve(`/cards/${attempt}`) : backSrc
 }
 
 watchEffect(() => {
   attempts.value = buildAttempts()
   const next = attempts.value.shift()
-  src.value = next ? resolve(`/cards/${next}`) : resolve('/cards/BACK.png')
+  src.value = next ? resolve(`/cards/${next}`) : backSrc
 })
 
 function onError(){
   if(!attempts.value.length){
-    src.value = resolve('/cards/BACK.png')
+    src.value = backSrc
     return
   }
   src.value = nextSrc()
